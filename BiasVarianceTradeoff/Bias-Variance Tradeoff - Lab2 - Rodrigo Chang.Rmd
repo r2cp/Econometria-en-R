@@ -1,0 +1,207 @@
+---
+title: "Laboratorio 2"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+**Rodrigo Chang**
+*Carné: 19000625*
+
+Cargamos las librerías para obtener los datos y manipularlos.
+
+```{r}
+library(MASS)
+library(dplyr)
+```
+
+# Replanteamos el ejercicio hecho en clase
+
+Cargamos los datos y ajustamos los nombres de las columnas para poder crear una fórmula modificable de "input"
+
+```{r}
+# Carga de datos
+data <- Boston %>% 
+  dplyr::select(lstat,medv)
+
+names(data)[1] <- "input"
+names(data)[2] <- "output"
+
+str(data)
+```
+
+## Algunas funciones de ayuda
+
+Creamos una función para obtener una muestra de bootstrap del dataset: 
+
+```{r}
+# Función para obtener un boot sample
+get_boot_sample <- function(x, dataset, size) {
+  return(sample_n(dataset, size = size, replace = TRUE))
+}
+```
+
+Esta función se utiliza para ajustar un modelo de polinomial de output ~ f(input).
+
+```{r}
+# Función para ajustar modelo de grado 'degree'
+fit_lm <- function(dataset, degree = 2) {
+  if (degree == 0) {
+    fit <- lm("output ~ 1", data = dataset)
+  } else {
+    formula <- paste0("I(","input^", 1:degree, ")", collapse = '+')
+    formula <- paste0("output ~ ", formula)
+    fit <- lm(formula, data = dataset)
+  }
+  return(fit)
+}
+```
+
+Esta función nos servirá para obtener los valores ajustados del modelo en el rango de la variable *input*
+
+```{r}
+# Esta función genera los valores de pronóstico para las gráficas
+model_fitted_plotdata <- function(fit){
+  xaxis <- seq(min(data$input), max(data$input), by=0.01)
+  yaxis <- predict(fit, tibble(input = xaxis))
+  return(tibble(input = xaxis, output = yaxis))
+}
+
+model_fitted_values <- function(fit, dataset) {
+  xaxis <- dataset$input
+  yaxis <- predict(fit, tibble(input = xaxis))
+  return(tibble(input = xaxis, output = dataset$output, f = yaxis))
+}
+```
+
+Ahora vamos a graficar todas las funciones de hipótesis con muestras de bootstrap:
+
+## Gráficas de todas las funciones de hipótesis
+
+```{r}
+# Definiciones para el ejercicio de bootstrap
+nboots <- 100
+bootsize <- nrow(data)
+
+# Obtenemos las muestras de bootstrap en una lista
+boot_samples <- lapply(1 : nboots, get_boot_sample, dataset = data, size = bootsize)
+
+# Obtenemos una lista de modelos ajustados con la muestra y obtenemos los valores ajustados
+all.models <- lapply(boot_samples, fit_lm, degree = 10)
+all.model.predictions <- lapply(all.models, model_fitted_plotdata)
+```
+
+Vamos a graficar el valor promedio de las funciones de hipótesis
+```{r}
+# Obtenemos todas las funciones de hipótesis en una misma estructura
+all.hypothesis <- bind_rows(all.model.predictions, .id = "boot")
+
+# Obtenemos la media con dplyr
+mean_pred <- all.hypothesis %>% 
+  group_by(input) %>% 
+  summarise(mean_fn = mean(output))
+
+# Graficamos las hipótesis en gris y los valores promedio en rojo
+plot(data, pch=20, cex=0.25)
+for(i in 1:nboots) {
+  points(all.model.predictions[[i]], col='gray', type='l')
+}
+points(mean_pred, type = 'l', col='red')
+```
+
+# Cómputo del sesgo y la varianza
+
+Ahora vamos a obtener los valores ajustados de todos los modelos para el dataset original.
+
+```{r}
+datatest <- data
+for (i in 1:100) {
+  modelo_str <- paste("f", i, sep = "")
+  datatest[[modelo_str]] <- predict(all.models[[i]], tibble(input = datatest$input))
+}
+
+head(datatest)
+```
+
+Vamos a computar el valor promedio $\bar{\hat{f}}$ de las funciones de hipótesis para cada $x_j$:
+
+```{r}
+f_hat_mean <- datatest %>%
+  dplyr::select(starts_with("f")) %>%
+  rowSums / 100
+```
+
+Ahora vamos a computar la varianza del modelo en cada $x_j$
+
+```{r}
+varX <- (1/(100-1)) * rowSums((datatest %>% dplyr::select(starts_with("f")) - f_hat_mean)^2)
+varianza <- mean(varX)
+varianza
+```
+
+Ahora vamos a computar el sesgo (al cuadrado) del modelo en cada $x_j$
+
+```{r}
+sesgoX <- (datatest$output - f_hat_mean)^2
+sesgo <- mean(sesgoX)
+sesgo
+```
+
+# Ejercicio de implementación
+
+Vamos a crear una función más general para obtener la varianza del modelo en función del grado del polinomio.
+
+```{r}
+# Función para la varianza
+sesgo.varianza.fn <- function(grado, df, B, n) {
+  
+  print(sprintf("Generando modelo de complejidad %d", grado))
+  
+  # Obtenemos las muestras de bootstrap en una lista
+  boot_samples <- lapply(1 : B, get_boot_sample, dataset = df, size = n)
+  
+  # Obtenemos una lista de modelos ajustados con la muestra y obtenemos los valores ajustados
+  all.models <- lapply(boot_samples, fit_lm, degree = grado)
+  
+  # Generamos los valores ajustados de todos los modelos
+  all.models.predictions <- lapply(all.models, predict, tibble(input = data$input))
+  all.models.predictions <- do.call(cbind, all.models.predictions)
+
+  # Computamos los valores ajustados promedio
+  f_hat_mean <- rowSums(all.models.predictions) / B
+  
+  # Obtenemos la varianza
+  varX <- (1/(B-1)) * rowSums((all.models.predictions - f_hat_mean)^2)
+  varianza <- mean(varX)
+  
+  # Obtener el sesgo
+  sesgoX <- (datatest$output - f_hat_mean)^2
+  sesgo <- mean(sesgoX)
+  
+  return(c("Sesgo" = sesgo, "Varianza" = varianza))
+}
+
+```
+
+Ahora, vamos a generar modelos de diferente complejidad para evaluar su sesgo y precisión:
+
+```{r}
+cmplx = 11
+modl.var <- lapply(c(0:cmplx), sesgo.varianza.fn, df = data, B = 1000, n = nrow(data))
+```
+
+Organizamos nuestros datos de sesgo y varianza en función del grado del polinomio:
+```{r}
+dataComplex <- as.data.frame(do.call(rbind, modl.var))
+dataComplex[["GradoPolinomio"]] = 0:cmplx
+dataComplex
+```
+Como vemos, conforme aumenta la complejidad del modelo, el sesgo disminuye y la varianza se incrementa. De acuerdo con la información dada por esta tabla, **el modelo con mejor balance de sesgo y varianza sería el modelo de polinómico de grado 7**.
+
+
+## Graficamos el sesgo y la varianza
+```{r}
+plot(x=dataComplex$GradoPolinomio, y=dataComplex$Sesgo, type = "l", col = "red", 
+     xlab = "Grado del polinomio")
+lines(x=dataComplex$GradoPolinomio, y=dataComplex$Varianza, type = "l", col = "blue")
+```

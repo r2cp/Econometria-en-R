@@ -1,0 +1,18 @@
+Proyecto final de Econometría en R
+---------------------------------------------------------------------
+
+Rodrigo Chang
+Carné: 19000625
+
+Algunos comentarios de lo que se encuentra trabajado en esta carpeta: 
+---------------------------------------------------------------------
+
+- Ejecute el archivo alg_genetico_v4.r, que contiene las funciones del algoritmo genético para la selección de variables. 
+
+- Las funciones fueron modificadas para obtener la métrica de RMSE de validación cruzada utilizando k-folds. Se aplican múltiples transformaciones de las variables y se deja que el algoritmo genético seleccione las mejores para obtener un modelo para cada tipo de University Rating. 
+
+- Se ajustan 5 modelos para mejorar la evaluación de cada uno de ellos a la vez. 
+
+- También se hacen pruebas con SVR con kernel polinomiales y RBF, que aplican transformaciones a cada pareja de puntos, pero la función de pronóstico del modelo final sigue siendo lineal. En general, los algoritmos genéticos se desempeñaron mejor que los modelos de SVR, sin embargo, se dejó un modelo de SVR para la categoría de University Rating = 3
+
+- Se trabajan algunas visualizaciones en Tableau para entender mejor el comportamiento de los datos.

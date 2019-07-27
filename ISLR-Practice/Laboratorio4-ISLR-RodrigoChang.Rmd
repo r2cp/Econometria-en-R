@@ -1,0 +1,220 @@
+---
+title: "Laboratorio de regresión lineal ISLR"
+output: html_notebook
+---
+
+Rodrigo Chang
+
+Carné: 19000625
+
+### Cargando librerías
+```{r}
+library(MASS)
+library(ISLR)
+```
+
+# Regresión lineal simple
+
+```{r}
+fix(Boston)
+names(Boston)
+```
+
+R no encuentra las variables
+```{r}
+lm.fit <- lm(medv~lstat)
+```
+
+Si referimos el dataset o utilizamos la función *attach* entonces la regresión funciona:
+```{r}
+lm.fit <- lm(medv ~ lstat, data=Boston)
+lm.fit
+```
+
+```{r}
+attach(Boston)
+lm.fit <- lm(medv ~ lstat)
+lm.fit
+```
+
+Mostramos un resumen más completo de la regresión:
+```{r}
+summary(lm.fit)
+```
+
+Accedemos a las otras piezas de información en la regresión:
+```{r}
+names(lm.fit)
+```
+```{r}
+coef(lm.fit)
+```
+
+Para obtener un intervalo de confianza para los estimadores, utilizamos el comando confint().
+```{r}
+confint(lm.fit)
+```
+
+La función predict() puede ser utilizada para producir intervalos de confianza e intervalos de predicción de *medv* para un valor dado de *lstat*.
+```{r}
+predict(lm.fit, data.frame(lstat = c(5,10,15)), interval = "confidence")
+```
+
+Para obtener los intervalos de predicción: 
+```{r}
+predict(lm.fit, data.frame(lstat = c(5,10,15)), interval = "prediction")
+```
+
+Vamos a graficar las variables:
+```{r}
+plot(lstat, medv)
+abline(lm.fit, lwd = 3, col = "red", pch = "+")
+```
+
+Ahora examinamos algunas gráficas de diagnóstico:
+```{r}
+par(mfrow = c(2, 2))
+plot(lm.fit)
+```
+
+La primera gráfica la podemos producir, de forma alternativa, utilizando los siguientes comandos:
+```{r}
+plot(predict(lm.fit), residuals(lm.fit))
+```
+
+```{r}
+plot(predict(lm.fit), rstudent(lm.fit))
+```
+
+```{r}
+plot(hatvalues(lm.fit))
+```
+
+Esta función identifica el índice del elemento más grande de un vector. En este caso, nos muestra la observación con el estadístico de *leverage* más grande.
+
+El *leverage* es una medida de qué tan lejos están los valores de la variable independiente para una observación, del resto de observaciones. 
+
+```{r}
+which.max(hatvalues(lm.fit))
+```
+
+
+# Regresión lineal múltiple
+
+Utilizando más regresoras:
+```{r}
+lm.fit <- lm(medv ~ lstat + age, data = Boston)
+summary(lm.fit)
+```
+
+Para utilizar todos las otras variables del dataset como regresoras utilizamos la notación:
+```{r}
+lm.fit <- lm(medv ~ . -crim, data = Boston )
+summary(lm.fit)
+```
+
+```{r}
+lm.fit1 <- lm(medv ~ .-age, data = Boston)
+summary(lm.fit1)
+```
+
+Utilizando la función *update*
+```{r}
+lm.fit1 <- update(lm.fit, ~.-age)
+```
+
+
+
+# Términos de interacción
+
+Esta notación incluye las dos variables y su interración (producto)
+
+```{r}
+summary(lm(medv ~ lstat*age, data = Boston))
+```
+
+# Transformaciones no lineales de las variables predictoras
+
+Haciendo una regresión de *medv* con *lstat* y *lstat*^2 
+```{r}
+lm.fit2 <- lm(medv ~ lstat + I(lstat^2), data=Boston)
+summary(lm.fit2)
+```
+
+El p-valor cercano a cero del término cuadrático sugiere que el modelo cuadrático es mejor al modelo lineal. Utilizamos la función anova() para cuantificar en qué grado el ajuste del modelo cuadrático es mejor al del modelo lineal:
+
+```{r}
+lm.fit <- lm(medv ~ lstat, data = Boston)
+anova (lm.fit, lm.fit2)
+```
+
+La hipótesis nula es que ambos modelos ajustan los datos igualmente bien. La hipótesis alternativa es que el modelo completo (con término cuadrático) es superior. En este caso, existe evidencia clara para aseverar que el modelo con término cuadrático es muy superior al modelo lineal simple. Esto no es sorpresa del todo, debido a que anteriormente vimos que existía una relación no lineal entre las variables *medv* y *lstat*. 
+
+```{r}
+par(mfrow = c(2,2))
+plot(lm.fit2)
+```
+
+Para crear un polinomio de mayor grado, podemos utilizar la función *poly()*:
+
+```{r}
+lm.fit5 <- lm(medv ~ poly(lstat, 5), data = Boston)
+summary(lm.fit5)
+```
+
+También es posible utilizar otras transformaciones de las variables predictoras.
+```{r}
+summary(lm(medv~log(rm), data = Boston))
+```
+
+
+# Variables predictoras cualitativas (dicótomas o *dummies*)
+
+```{r}
+fix(Carseats)
+names(Carseats)
+```
+
+La variable "ShelveLoc" es cualtiativa, con valores *Bad*, *Medium* y *Good*. Cuando la variable es un factor, R crea automáticamente variables *dummy* para la regresión.
+
+```{r}
+str(Carseats$ShelveLoc)
+```
+
+```{r}
+lm.fit <- lm(Sales ~ . + Income:Advertising + Price:Age, data=Carseats)
+summary(lm.fit)
+```
+
+La función *contrasts()* devuelve la codificación utilizada por R para la variable dicótoma:
+```{r}
+attach(Carseats)
+contrasts(ShelveLoc)
+```
+
+Esto quiere decir que la categoría base en la regresión es el valor ShelveLocGood = 0 y ShelveLocMedium = 0, es decir, la categoría base es cuando ShelveLoc = "Bad".
+
+
+
+# Escribiendo funciones
+
+Vamos a crear una función que cargue las librerías:
+
+```{r}
+LoadLibraries = function () {
+  library(ISLR)
+  library(MASS)
+  print("Las librerías fueron cargadas.")
+}
+```
+
+Si escribimos el nombre de nuestra función, R nos devuelve su código:
+```{r}
+LoadLibraries
+```
+
+Para llamarla, utilizamos los paréntesis:
+```{r}
+LoadLibraries()
+```
+

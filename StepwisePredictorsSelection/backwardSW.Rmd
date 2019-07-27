@@ -1,0 +1,69 @@
+---
+title: "Algoritmo *Backward Stepwise*"
+output:
+  html_document:
+    df_print: paged
+---
+
+**Rodrigo Chang**
+
+**Carné: 19000625**
+
+A continuación, se presenta una implementación del algoritmo de *Backward Stepwise* para la selección del mejor modelo de $p$ a $P$ variables predictoras, donde $p$ es un parámetro para el algoritmo, tal que $p < P$ y $P$ es el número total de predictoras del conjunto de datos.
+
+# Carga de funciones y librerías
+
+Se cargan las funciones previdamente trabajadas en el archivo *stepwise_fn.r* para llevar a cabo el proceso de ajuste de cada modelo y la validación.
+```{r}
+# Cargamos funciones del algoritmo y de validación
+source(file = "stepwise_fn.r")
+
+# Cargamos librerías para demostración
+library(MASS)
+```
+
+# Código de ejemplo del algoritmo
+
+Ahora, definimos algunos parámetros para utilizar las funciones que se trabajaron: 
+
+```{r}
+dataset <- Boston
+target <- "medv"
+p <- 5
+```
+
+Obtenemos una lista de los mejores modelos de $p = 5$ hasta $P=13$ variables predictoras para la variable *medv* del dataset *Boston*:
+
+```{r}
+listaVar <- backward.stepwise.fn(dataset = Boston, target = target, p)
+```
+
+Examinamos la lista de variables: 
+```{r}
+listaVar
+```
+
+
+Utilizamos la función *cv.models.fn* para validar los modelos obtenidos con *K-fold CV* con $k = 10$. Esta función nos devuelve el error promedio (de validación cruzada) de cada uno de los modelos, lo que nos permitirá seleccionar aquel con menor error de validación cruzada.
+
+```{r}
+cvMeasures <- sapply(listaVar, cv.models.fn, dataset = Boston, target = target)
+cvMeasures
+```
+
+Y obtenemos el mejor modelo, seleccionándolo de la lista, tal que minimice la suma de errores al cuadrado en las medidas de validación obtenidas.
+
+```{r}
+# Obtener el mejor modelo:
+i.minmdl <- which.min(cvMeasures)
+
+# Predictoras mejor modelo 
+listaVar[[i.minmdl]]
+
+modelo <- lm(formula = paste(target, "~", paste(listaVar[[i.minmdl]], collapse = "+"), collapse = ""),
+             data = dataset)
+
+summary(modelo)
+```
+
+Como se observa, en este caso, el modelo que minimiza el error de validación es el que tiene 10 variables y no el que posee todas las variables explicativas del dataset.
